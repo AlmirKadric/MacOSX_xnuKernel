@@ -268,7 +268,7 @@ dr7_is_valid(uint32_t *dr7)
 	return (TRUE);
 }
 
-static inline void
+static __unused inline void
 set_live_debug_state32(cpu_data_t *cdp, x86_debug_state32_t *ds)
 {
 	__asm__ volatile ("movl %0,%%db0" : :"r" (ds->dr0));
@@ -280,7 +280,7 @@ set_live_debug_state32(cpu_data_t *cdp, x86_debug_state32_t *ds)
 
 extern void set_64bit_debug_regs(x86_debug_state64_t *ds);
 
-static inline void
+static __unused inline void
 set_live_debug_state64(cpu_data_t *cdp, x86_debug_state64_t *ds)
 {
 	/*

@@ -533,6 +533,7 @@ do_init_slave(boolean_t fast_restart)
 
 #if CONFIG_VMX
 	/* resume VT operation */
+    if (cpuid_extfeatures() & CPUID_FEATURE_VMX)
 	vmx_resume();
 #endif
 

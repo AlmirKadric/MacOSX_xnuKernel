@@ -419,7 +419,7 @@ mac_policy_grab_exclusive(void)
 	}
 }
 
-static __inline void
+static __unused __inline void
 mac_policy_assert_exclusive(void)
 {
 	lck_mtx_assert(mac_policy_mtx, LCK_MTX_ASSERT_OWNED);

@@ -68,7 +68,7 @@ vmxon_is_enabled(void)
    vmx_is_cr0_valid()
 	Is CR0 valid for executing VMXON on this CPU?
    -------------------------------------------------------------------------- */
-static inline boolean_t
+static __unused inline boolean_t
 vmx_is_cr0_valid(vmx_specs_t *specs)
 {
 	uintptr_t cr0 = get_cr0();
@@ -79,7 +79,7 @@ vmx_is_cr0_valid(vmx_specs_t *specs)
    vmx_is_cr4_valid()
 	Is CR4 valid for executing VMXON on this CPU?
    -------------------------------------------------------------------------- */
-static inline boolean_t
+static __unused inline boolean_t
 vmx_is_cr4_valid(vmx_specs_t *specs)
 {
 	uintptr_t cr4 = get_cr4();

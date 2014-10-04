@@ -302,20 +302,20 @@ struct bondport_s {
 static int bond_get_status(ifbond_ref ifb, struct if_bond_req * ibr_p, 
 			   user_addr_t datap);
 
-static __inline__ int
+static __unused __inline__ int
 ifbond_flags_promisc(ifbond_ref ifb)
 {
     return ((ifb->ifb_flags & IFBF_PROMISC) != 0);
 }
 
-static __inline__ void
+static __unused __inline__ void
 ifbond_flags_set_promisc(ifbond_ref ifb)
 {
     ifb->ifb_flags |= IFBF_PROMISC;
     return;
 }
 
-static __inline__ void
+static __unused __inline__ void
 ifbond_flags_clear_promisc(ifbond_ref ifb)
 {
     ifb->ifb_flags &= ~IFBF_PROMISC;
@@ -341,14 +341,14 @@ ifbond_flags_lladdr(ifbond_ref ifb)
     return ((ifb->ifb_flags & IFBF_LLADDR) != 0);
 }
 
-static __inline__ void
+static __unused __inline__ void
 ifbond_flags_set_lladdr(ifbond_ref ifb)
 {
     ifb->ifb_flags |= IFBF_LLADDR;
     return;
 }
 
-static __inline__ void
+static __unused __inline__ void
 ifbond_flags_clear_lladdr(ifbond_ref ifb)
 {
     ifb->ifb_flags &= ~IFBF_LLADDR;

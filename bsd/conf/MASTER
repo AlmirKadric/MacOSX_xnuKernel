@@ -387,8 +387,9 @@ options   CONFIG_MFCTBLSIZ=16			# <bsmall>
 #
 # configurable kernel message buffer size
 #
-options   CONFIG_MSG_BSIZE=4096			# <bsmall,small,xsmall>
-options   CONFIG_MSG_BSIZE=16384		# <medium,large,xlarge>
+#options   CONFIG_MSG_BSIZE=4096			# <bsmall,small,xsmall>
+#options   CONFIG_MSG_BSIZE=16384		# <medium,large,xlarge>
+options   CONFIG_MSG_BSIZE=65536		# <bsmall,small,xsmall,medium,large,xlarge>
 
 #
 #  configurable kernel - use these options to strip strings from panic

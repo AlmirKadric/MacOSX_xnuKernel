@@ -155,11 +155,11 @@ CFLAGS_X86_64	= -Dx86_64 -DX86_64 -D__X86_64__ -DLP64 \
 				-fno-limit-debug-info # Workaround for 11076603
 
 
-CFLAGS_RELEASEX86_64 = -O2
-CFLAGS_DEVELOPMENTX86_64 = -O2
+CFLAGS_RELEASEX86_64 = -O2 -march=k8 -mno-ssse3 -mno-sse3
+CFLAGS_DEVELOPMENTX86_64 = -O2 -march=k8 -mno-ssse3 -mno-sse3
 # No space optimization for the DEBUG kernel for the benefit of gdb:
-CFLAGS_DEBUGX86_64 = -O0
-CFLAGS_PROFILEX86_64 = -O2
+CFLAGS_DEBUGX86_64 = -O0 -march=k8 -mno-ssse3 -mno-sse3
+CFLAGS_PROFILEX86_64 = -O2 -march=k8 -mno-ssse3 -mno-sse3
 
 CFLAGS_RELEASEARM = -O2
 CFLAGS_DEVELOPMENTARM = -O2

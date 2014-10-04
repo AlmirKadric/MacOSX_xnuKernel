@@ -282,7 +282,12 @@ commpage_init_cpu_capabilities( void )
 	setif(bits, kHasAVX2_0,  cpuid_leaf7_features() &
 					CPUID_LEAF7_FEATURE_AVX2);
 	
-	uint64_t misc_enable = rdmsr64(MSR_IA32_MISC_ENABLE);
+	uint64_t misc_enable = 0;
+    
+	if (IsIntelCPU())
+    {
+        misc_enable = rdmsr64(MSR_IA32_MISC_ENABLE);
+    }
 	setif(bits, kHasENFSTRG, (misc_enable & 1ULL) &&
 				 (cpuid_leaf7_features() &
 					CPUID_LEAF7_FEATURE_ENFSTRG));

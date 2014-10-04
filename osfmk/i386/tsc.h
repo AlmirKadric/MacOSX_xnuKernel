@@ -43,6 +43,10 @@
 #define BASE_NHM_CLOCK_SOURCE 	133333333ULL
 #define IA32_PERF_STS		0x198
 #define	SLOW_TSC_THRESHOLD	1000067800	/* if slower, nonzero shift required in nanotime() algorithm */
+#define AMD_PERF_STS	0xC0010042	/* AMD's version of the MSR */
+#define AMD_COFVID_STS 0xC0010071
+#define AMD_PSTATE0_STS 0xC0010064
+
 
 #ifndef ASSEMBLER
 extern uint64_t	busFCvtt2n;

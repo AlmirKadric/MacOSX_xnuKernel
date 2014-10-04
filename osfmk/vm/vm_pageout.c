@@ -1195,6 +1195,20 @@ uint32_t vm_page_filecache_min = 0;
 #define	VM_PAGE_FILECACHE_MIN	50000
 #define ANONS_GRABBED_LIMIT	2
 
+void inline memoryshot(unsigned int event, unsigned int control)
+{
+	if (vm_debug_events) {
+		KERNEL_DEBUG_CONSTANT1((MACHDBG_CODE(DBG_MACH_VM_PRESSURE, event)) | control,
+                               vm_page_active_count, vm_page_inactive_count,
+                               vm_page_free_count, vm_page_speculative_count,
+                               vm_page_throttled_count);
+	} else {
+		(void) event;
+		(void) control;
+	}
+    
+}
+
 /*
  *	vm_pageout_scan does the dirty work for the pageout daemon.
  *	It returns with both vm_page_queue_free_lock and vm_page_queue_lock
@@ -8811,20 +8825,6 @@ vm_page_slide(
 	vm_object_paging_end(page->object);
 
 	return kr;
-}
-
-void inline memoryshot(unsigned int event, unsigned int control)
-{
-	if (vm_debug_events) {
-		KERNEL_DEBUG_CONSTANT1((MACHDBG_CODE(DBG_MACH_VM_PRESSURE, event)) | control,
-					vm_page_active_count, vm_page_inactive_count,
-					vm_page_free_count, vm_page_speculative_count,
-					vm_page_throttled_count);
-	} else {
-		(void) event;
-		(void) control;
-	}
-
 }
 
 #ifdef MACH_BSD

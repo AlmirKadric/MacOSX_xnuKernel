@@ -185,6 +185,13 @@
 #define CPUID_VMM_FAMILY_UNKNOWN	0x0
 #define CPUID_VMM_FAMILY_VMWARE		0x1
 
+#define K10_FAMILY 0x10U
+#define K15_FAMILY 0x15U
+#define K8_FAMILY  0xFU
+
+#define CPU_MODEL_PENTIUM_4_M2 0x2
+#define CPU_MODEL_PENTIUM_4 0x4
+
 #ifndef ASSEMBLER
 #include <stdint.h>
 #include <mach/mach_types.h>
@@ -399,7 +406,14 @@ extern boolean_t	cpuid_vmm_present(void);
 extern i386_vmm_info_t	*cpuid_vmm_info(void);
 extern uint32_t		cpuid_vmm_family(void);
 #endif
-
+    
+    extern boolean_t	IsAmdCPU(void);
+    extern boolean_t	IsIntelCPU(void);
+    extern uint32_t
+    extractBitField(uint32_t inField, uint32_t width, uint32_t offset);
+    extern uint32_t
+    getBitFieldWidth(uint32_t number);
+    
 #ifdef __cplusplus
 }
 #endif
@@ -407,4 +421,7 @@ extern uint32_t		cpuid_vmm_family(void);
 #endif /* ASSEMBLER */
 
 #endif /* __APPLE_API_PRIVATE */
+#define CPU_FAMILY_PENTIUM_M	(0x6)
+#define CPU_FAMILY_PENTIUM_4	(0xF)
+#define CPU_FAMILY_PENTIUM_4_M2 (0xF)
 #endif /* _MACHINE_CPUID_H_ */

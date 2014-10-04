@@ -979,7 +979,7 @@ mp_call_head_lock(mp_call_queue_t *cqp)
 	return intrs_enabled;
 }
 
-static inline boolean_t
+static __unused inline boolean_t
 mp_call_head_is_locked(mp_call_queue_t *cqp)
 {
 	return !ml_get_interrupts_enabled() &&

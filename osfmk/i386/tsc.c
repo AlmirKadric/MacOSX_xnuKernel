@@ -77,6 +77,7 @@ uint32_t	flex_ratio_min = 0;
 uint32_t	flex_ratio_max = 0;
 
 uint64_t	tsc_at_boot = 0;
+uint64_t cpuFreqCOF = 0;
 
 #define bit(n)		(1ULL << (n))
 #define bitmask(h,l)	((bit(h)|(bit(h)-1)) & ~(bit(l)-1))
@@ -93,6 +94,43 @@ uint64_t	tsc_at_boot = 0;
 
 static const char	FSB_Frequency_prop[] = "FSBFrequency";
 static const char	TSC_at_boot_prop[]   = "InitialTSC";
+static const char  FSB_CPUFrequency_prop[] = "CPUFrequency";
+
+
+static  uint64_t cpuMultAmd(void);
+static  uint64_t cpuFreqAmd(void);
+
+static uint64_t
+EFI_CPU_Frequency(void)
+{
+	uint64_t	frequency = 0;
+	DTEntry		entry;
+	void		*value;
+	unsigned int	size;
+	
+	if (DTLookupEntry(0, "/efi/platform", &entry) != kSuccess) {
+		kprintf("EFI_CPU_Frequency: didn't find /efi/platform\n");
+		return 0;
+	}
+	if (DTGetProperty(entry,FSB_CPUFrequency_prop,&value,&size) != kSuccess) {
+		kprintf("EFI_CPU_Frequency: property %s not found\n",
+				FSB_Frequency_prop);
+		return 0;
+	}
+	if (size == sizeof(uint64_t)) {
+		frequency = *(uint64_t *) value;
+		kprintf("EFI_CPU_Frequency: read %s value: %llu\n",
+				FSB_Frequency_prop, frequency);
+		if (!(10*Mega < frequency && frequency < 50*Giga)) {
+			kprintf("EFI_Fake_MSR: value out of range\n");
+			frequency = 0;
+		}
+	} else {
+		kprintf("EFI_CPU_Frequency: unexpected size %d\n", size);
+	}
+	return frequency;
+}
+
 /*
  * This routine extracts the bus frequency in Hz from the device tree.
  * Also reads any initial TSC value at boot from the device tree.
@@ -105,6 +143,12 @@ EFI_FSB_frequency(void)
 	void		*value;
 	unsigned int	size;
 
+    if (IsIntelCPU())
+	{
+		
+		int  res;
+		if (PE_parse_boot_argn("fsb", &res,sizeof(res))) return res * Mega;
+        
 	if (DTLookupEntry(0, "/efi/platform", &entry) != kSuccess) {
 		kprintf("EFI_FSB_frequency: didn't find /efi/platform\n");
 		return 0;
@@ -125,19 +169,268 @@ EFI_FSB_frequency(void)
 	} else {
 		kprintf("EFI_FSB_frequency: unexpected size %d\n", size);
 	}
-
-	/*
-	 * While we're here, see if EFI published an initial TSC value.
-	 */
-	if (DTGetProperty(entry,TSC_at_boot_prop,&value,&size) == kSuccess) {
-		if (size == sizeof(uint64_t)) {
-			tsc_at_boot = *(uint64_t *) value;
-			kprintf("EFI_FSB_frequency: read %s value: %llu\n",
-				TSC_at_boot_prop, tsc_at_boot);
+        
+        /*
+         * While we're here, see if EFI published an initial TSC value.
+         */
+        if (DTGetProperty(entry,TSC_at_boot_prop,&value,&size) == kSuccess) {
+            if (size == sizeof(uint64_t)) {
+                tsc_at_boot = *(uint64_t *) value;
+                kprintf("EFI_FSB_frequency: read %s value: %llu\n",
+                        TSC_at_boot_prop, tsc_at_boot);
+            }
+        }
+    }
+    
+    if (IsAmdCPU())
+	{
+		int  res;
+		uint64_t cpuMult,cpuMultN2,Mult_N2;
+		uint64_t cpuFreq,cpuFreqN2,cpuFreq_NT;
+		
+		
+		if (PE_parse_boot_argn("fsb", &res,sizeof(res))) return res * Mega;
+		
+		cpuMult	= cpuMultAmd();
+		cpuFreq = cpuFreqAmd();
+		
+		switch (cpuid_info()->cpuid_family) {
+			case 0xF:
+			{
+				
+				uint64_t prfsts;
+				prfsts	= rdmsr64(AMD_PERF_STS);
+				cpuMultN2 = (prfsts & bit(0)) != 0;
+			}
+				break;
+			default :
+			{
+				uint64_t prfsts;
+				prfsts = rdmsr64(AMD_COFVID_STS);
+				cpuMultN2 = (prfsts & bit(0)) != 0;
+			}
+				break;
+				
+		}
+		
+		
+		if(cpuMultN2)
+		{
+			printf("FSB Detection: from BIOS calculated Mult_N2 %llu, cpuFreq %lld \n", cpuMult, cpuFreq);
+			
+			cpuFreqN2 = ((1 * Giga)  << 32) / (cpuFreq) ;
+			cpuFreq_NT = cpuFreqN2 * 2  /(100*(1+2*cpuMult));
+			Mult_N2 =  cpuFreqN2 /  cpuFreq_NT;
+			
+			frequency = ((1 * Giga) << 32) / cpuFreqN2 / ( Mult_N2 ) ;
+			
+			return frequency * 100;
+		}
+		//Else try to autodetect
+		else{
+			printf("FSB Detection: from BIOS calculated Mult %llu, cpuFreq %lld \n", cpuMult, cpuFreq);
+			if (cpuMult == 0 || cpuFreq == 0)
+			{
+				//  if (DetectFSB_NonClocked()) return DetectFSB_NonClocked() * Mega;
+				return frequency = 200 * Mega;
+			}
+			else
+			{
+				frequency = cpuFreq / cpuMult;
+				if (frequency) return frequency;
+				else return frequency = 200 * Mega;
+			}
 		}
 	}
+    
+	
 
 	return frequency;
+}
+
+typedef unsigned long long vlong;
+
+static uint64_t cpuMultAmd(void)
+{
+	
+	switch (cpuid_info()->cpuid_family) {
+			
+		case 0xF:
+		{
+			
+			uint64_t CoolnQuiet = 0;
+			uint32_t reg[4];
+			uint64_t curMP;
+			uint64_t prfsts;
+			
+			
+			do_cpuid(0x80000007, reg);
+			CoolnQuiet = ((reg[edx] & 0x6) == 0x6) ;
+			if (CoolnQuiet)
+			{
+				prfsts	= rdmsr64(AMD_PERF_STS);
+				printf("rtclock_init: Athlon's MSR 0x%x \n", AMD_PERF_STS);
+				
+				curMP = ((prfsts & 0x3F) + 8)/2;
+				//printf("curMP:  0d \n", curMP);
+				
+				//Mhz = (800 + 200*((prfsts>>1) & 0x1f)) * 1000000ll;
+				//printf("Mhz: %lld\n",  Mhz );
+				cpuFreqCOF = curMP ;
+				printf("cpuFreqCOF: %lld\n",  cpuFreqCOF );
+			}
+			else
+			{
+				prfsts = rdmsr64(0xC0010015);
+				cpuFreqCOF = (uint32_t)bitfield(prfsts, 29, 24);
+				
+			}
+			
+		}
+			break;
+			
+		case 0x10:
+		case 0x11:
+		{
+			// 8:6 CpuDid: current core divisor ID
+			// 5:0 CpuFid: current core frequency ID
+			
+			uint64_t prfsts,CpuFid,CpuDid;
+			prfsts = rdmsr64(AMD_PSTATE0_STS);
+			
+			CpuDid = bitfield(prfsts, 8, 6) ;
+			CpuFid = bitfield(prfsts, 5, 0) ;
+			/*switch (CpuDid) {
+			 case 0: divisor = 1; break;
+			 case 1: divisor = 2; break;
+			 case 2: divisor = 4; break;
+			 case 3: divisor = 8; break;
+			 case 4: divisor = 16; break;
+			 default: divisor = 1; break;
+			 }*/
+			cpuFreqCOF = (CpuFid + 0x10) / (2^CpuDid);
+		}
+			break;
+			
+		case 0x15:
+		case 0x16:
+		case 0x06:
+		{
+			
+			uint64_t prfsts,CpuFid,CpuDid;
+			prfsts = rdmsr64(AMD_COFVID_STS);
+			uint64_t prfsts_2 = rdmsr64(0xC0010066);
+			CpuDid = bitfield(prfsts, 8, 6) & prfsts_2;
+			CpuFid = bitfield(prfsts, 5, 0) & prfsts_2;
+			
+			cpuFreqCOF = (CpuFid + 0x10) / (2^CpuDid);
+		}
+			break;
+		case 0x12: {
+			// 8:4 CpuFid: current CPU core frequency ID
+			// 3:0 CpuDid: current CPU core divisor ID
+			uint64_t prfsts,CpuFid,CpuDid;
+			prfsts = rdmsr64(AMD_COFVID_STS);
+			
+			CpuDid = bitfield(prfsts, 3, 0) ;
+			CpuFid = bitfield(prfsts, 8, 4) ;
+			uint64_t divisor;
+			switch (CpuDid) {
+				case 0: divisor = 1; break;
+				case 1: divisor = (3/2); break;
+				case 2: divisor = 2; break;
+				case 3: divisor = 3; break;
+				case 4: divisor = 4; break;
+				case 5: divisor = 6; break;
+				case 6: divisor = 8; break;
+				case 7: divisor = 12; break;
+				case 8: divisor = 16; break;
+				default: divisor = 1; break;
+			}
+			cpuFreqCOF = (CpuFid + 0x10) / divisor;
+			
+		}
+			break;
+		case 0x14: {
+			// 8:4: current CPU core divisor ID most significant digit
+			// 3:0: current CPU core divisor ID least significant digit
+			uint64_t prfsts;
+			prfsts = rdmsr64(AMD_COFVID_STS);
+			
+			uint64_t CpuDidMSD,CpuDidLSD;
+			CpuDidMSD = bitfield(prfsts, 8, 4) ;
+			CpuDidLSD  = bitfield(prfsts, 3, 0) ;
+			
+			uint64_t frequencyId = 0x10;
+			cpuFreqCOF = (frequencyId + 0x10) /
+			(CpuDidMSD + (CpuDidLSD /4 /** 0.25*/) + 1);
+		}
+			break;
+			
+			
+		default:
+		{
+			uint64_t prfsts;
+			prfsts = rdmsr64(AMD_COFVID_STS);
+			vlong hz,r;
+			r = (prfsts>>6) & 0x07;
+			hz = (((prfsts & 0x3f)+0x10)*100000000ll)/(1<<r);
+			printf("family %hhu \n",cpuid_info()->cpuid_family);
+			
+			cpuFreqCOF = hz / (200 * Mega);
+		}
+			
+	}
+	return cpuFreqCOF;
+}
+
+static uint64_t cpuFreqAmd(void)
+{
+	uint64_t cpuFreqMhz;
+	
+	uint8_t  dummyvar;
+	if (PE_parse_boot_argn("-cpuEFI", &dummyvar, sizeof(dummyvar))) return EFI_CPU_Frequency() ;
+	
+	switch (cpuid_info()->cpuid_family) {
+		case 0xF:
+		{
+			
+			uint64_t prfsts;
+			prfsts	= rdmsr64(AMD_PERF_STS);
+			cpuFreqMhz = (800 + 200*((prfsts>>1) & 0x1f)) * 1000000ll;
+		}
+			break;
+		case 0x10:
+		case 0x11:
+		case 0x12:
+		case 0x14:
+		{
+			uint64_t prfsts,r;
+			prfsts = rdmsr64(AMD_PSTATE0_STS);
+			//CpuDid = bitfield(prfsts, 8, 6) ;
+			//CpuFid = bitfield(prfsts, 5, 0) ;
+			r = (prfsts>>6) & 0x07;
+			cpuFreqMhz = (((prfsts & 0x3f)+0x10)*100000000ll)/(1<<r);
+			//(100 * Mega) * ((CpuFid + 0x10) /(1^CpuDid));
+		}
+			break;
+			
+		case 0x15:
+		case 0x16:
+		case 0x6:
+		{
+			uint64_t prfsts,CpuDid,CpuFid;
+			prfsts = rdmsr64(0xC0010066);
+			CpuDid = bitfield(prfsts, 8, 6) ;
+			CpuFid = bitfield(prfsts, 5, 0) ;
+			cpuFreqMhz = (100 * Mega) * ((CpuFid + 0x10) >> (CpuDid));
+		}
+			break;
+			
+		default:
+			return cpuFreqMhz = EFI_CPU_Frequency();
+	}
+	return cpuFreqMhz;
 }
 
 /*
@@ -179,7 +472,10 @@ tsc_init(void)
 	 */
 	busFreq = EFI_FSB_frequency();
 
-	switch (cpuid_cpufamily()) {
+	if (IsIntelCPU())
+	{
+    
+    switch (cpuid_cpufamily()) {
 	case CPUFAMILY_INTEL_HASWELL:
 	case CPUFAMILY_INTEL_IVYBRIDGE:
 	case CPUFAMILY_INTEL_SANDYBRIDGE:
@@ -208,8 +504,70 @@ tsc_init(void)
 		if (busFreq == 0)
 		    busFreq = BASE_NHM_CLOCK_SOURCE;
 
+        if (PE_parse_boot_argn("busratio", &tscGranularity, sizeof(tscGranularity)))
+        {
+            if (tscGranularity == 0) tscGranularity = 1; // avoid div by zero
+            N_by_2_bus_ratio = (tscGranularity > 30) && ((tscGranularity % 10) != 0);
+            if (N_by_2_bus_ratio) tscGranularity /= 10; // Scale it back to normal
+        }
+        
 		break;
             }
+            break;
+            switch (cpuid_info()->cpuid_family) {
+                    
+                case 0x6:
+                {
+                    if (cpuid_info()->cpuid_model >= 0xD)
+                    {
+                        uint64_t prfsts = 0;
+                        prfsts = rdmsr64(IA32_PERF_STS);
+                        tscGranularity	= (uint32_t)bitfield(prfsts, 44, 40);
+                        N_by_2_bus_ratio= (prfsts & bit(46))!=0;
+                    }
+                    if (PE_parse_boot_argn("busratio", &tscGranularity, sizeof(tscGranularity)))
+                    {
+                        if (tscGranularity == 0) tscGranularity = 1; // avoid div by zero
+                        N_by_2_bus_ratio = (tscGranularity > 30) && ((tscGranularity % 10) != 0);
+                        if (N_by_2_bus_ratio) tscGranularity /= 10; // Scale it back to normal
+                    }
+                }
+                    break;
+                    
+                case 15:
+                {
+                    if (cpuid_info()->cpuid_model == CPU_MODEL_PENTIUM_4)
+                    {
+                        
+                        //busFreq = EFI_FSB_frequency();
+                        uint64_t prfsts = 0;
+                        prfsts = rdmsr64(IA32_PERF_STS);
+                        tscGranularity	= (uint32_t)bitfield(prfsts, 44, 40);
+                        N_by_2_bus_ratio= (prfsts & bit(46))!=0;
+                        
+                    }
+                    
+                    else
+                    {
+                        if (cpuid_info()->cpuid_model == CPU_MODEL_PENTIUM_4_M2)
+                        {
+                            uint64_t prfsts = 0;
+                            prfsts		= rdmsr64(0x2C); // TODO: Add to header
+                            tscGranularity	= bitfield(prfsts, 31, 24);
+                        }
+                    }
+                    if (PE_parse_boot_argn("busratio", &tscGranularity, sizeof(tscGranularity)))
+                    {
+                        if (tscGranularity == 0) tscGranularity = 1; // avoid div by zero
+                        N_by_2_bus_ratio = (tscGranularity > 30) && ((tscGranularity % 10) != 0);
+                        if (N_by_2_bus_ratio) tscGranularity /= 10; // Scale it back to normal
+                    }
+                }
+                    break;
+            }
+            break;
+            
+            
 	default: {
 		uint64_t	prfsts;
 
@@ -218,7 +576,48 @@ tsc_init(void)
 		N_by_2_bus_ratio = (prfsts & bit(46)) != 0;
 	    }
 	}
-
+    }
+    
+    if (IsAmdCPU())
+	{
+		uint64_t prfsts;
+		
+		switch (cpuid_info()->cpuid_family) {
+			case 0xF:
+			{
+				prfsts	= rdmsr64(AMD_PERF_STS);
+			}
+				break;
+			default :
+			{
+				prfsts = rdmsr64(AMD_COFVID_STS);
+			}
+		}
+		
+		if (PE_parse_boot_argn("busratio", &tscGranularity, sizeof(tscGranularity)))
+		{
+			if (tscGranularity == 0) tscGranularity = 1; // avoid div by zero
+			N_by_2_bus_ratio = (tscGranularity > 30) && ((tscGranularity % 10) != 0);
+			if (N_by_2_bus_ratio) tscGranularity /= 10; // Scale it back to normal
+		}
+		else
+		{
+			N_by_2_bus_ratio = (prfsts & bit(0)) != 0;
+			tscGranularity = cpuMultAmd();
+			
+			if (tscGranularity == 0) tscGranularity = 1;
+			
+			
+			if(!N_by_2_bus_ratio)
+			{
+				N_by_2_bus_ratio = (tscGranularity > 30) && ((tscGranularity % 10) != 0);
+				if (N_by_2_bus_ratio) tscGranularity /= 10; // Scale it back to normal
+				
+			}
+		}
+		
+	}
+    
 	if (busFreq != 0) {
 		busFCvtt2n = ((1 * Giga) << 32) / busFreq;
 		busFCvtn2t = 0xFFFFFFFFFFFFFFFFULL / busFCvtt2n;

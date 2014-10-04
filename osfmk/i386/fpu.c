@@ -154,17 +154,17 @@ static inline void xrstor(void *a) {
 	__asm__ __volatile__(".short 0xAE0F\n\t.byte 0x29" :: "a"(XMASK), "d"(0), "c" (a));
 }
 
-static inline void xsave64(void *a) {
+static __unused inline void xsave64(void *a) {
 	/* Out of line call that executes in 64-bit mode on K32 */
 	__asm__ __volatile__("call _xsave64o" :: "a"(XMASK), "d"(0), "c" (a));
 }
 
-static inline void xrstor64(void *a) {
+static __unused inline void xrstor64(void *a) {
 	/* Out of line call that executes in 64-bit mode on K32 */
 	__asm__ __volatile__("call _xrstor64o" :: "a"(XMASK), "d"(0), "c" (a));
 }
 
-static inline unsigned short
+static __unused inline unsigned short
 fnstsw(void)
 {
 	unsigned short status;

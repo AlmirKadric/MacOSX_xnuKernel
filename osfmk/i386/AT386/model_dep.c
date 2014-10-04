@@ -690,6 +690,8 @@ halt_cpu(void)
 
 int reset_mem_on_reboot = 1;
 
+#include <chud/chud_xnu.h> // qoopz: chud kexts have cpuids, must remove them for AMD
+
 /*
  * Halt the system or reboot.
  */
@@ -697,8 +699,16 @@ void
 halt_all_cpus(boolean_t reboot)
 {
 	if (reboot) {
+        uint32_t ncpus, i;
+    	ncpus = chudxnu_logical_cpu_count();
+    	for (i = 0; i < ncpus; i++)
+            chudxnu_enable_cpu(i, FALSE);
+        
 		printf("MACH Reboot\n");
 		PEHaltRestart( kPERestartCPU );
+        asm volatile ("movb $0xfe, %al\n"
+                      "outb %al, $0x64\n"
+                      "hlt\n");
 	} else {
 		printf("CPU halted\n");
 		PEHaltRestart( kPEHaltCPU );

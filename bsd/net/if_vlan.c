@@ -263,7 +263,7 @@ vlan_parent_flags_set_supports_vlan_mtu(vlan_parent_ref vlp)
     return;
 }
 
-static __inline__ void
+static __unused __inline__ void
 vlan_parent_flags_clear_supports_vlan_mtu(vlan_parent_ref vlp)
 {
     vlp->vlp_flags &= ~VLPF_SUPPORTS_VLAN_MTU;
@@ -340,7 +340,7 @@ ifvlan_flags_set_ready(ifvlan_ref ifv)
     return;
 }
 
-static __inline__ void
+static __unused __inline__ void
 ifvlan_flags_clear_ready(ifvlan_ref ifv)
 {
     ifv->ifv_flags &= ~IFVF_READY;

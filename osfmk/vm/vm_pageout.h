@@ -145,7 +145,7 @@ extern int	vm_debug_events;
 	}							\
 	MACRO_END
 
-extern void inline memoryshot(unsigned int event, unsigned int control);
+extern void memoryshot(unsigned int event, unsigned int control);
 
 extern kern_return_t vm_map_create_upl(
 	vm_map_t		map,

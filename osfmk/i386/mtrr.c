@@ -105,7 +105,33 @@ static int  var_range_overlap(mtrr_var_range_t * range, addr64_t address,
  * Default mask for 36 physical address bits, this can
  * change depending on the cpu model.
  */
-static uint64_t mtrr_phys_mask = PHYS_BITS_TO_MASK(36);
+//static uint64_t mtrr_phys_mask = PHYS_BITS_TO_MASK(36);
+
+//Bronzovka: on cpu amd - check bit
+
+static inline unsigned int cpuid_eax(unsigned int op)
+{
+    // unsigned int eax;
+    uint32_t reg[4];
+    __asm__("mov %%ebx, %%edi;"
+            "cpuid;"
+            "mov %%edi, %%ebx;"
+            : "=a" (reg[eax])
+            : "0" (op)
+            : "ecx", "edx", "edi");
+    return reg[eax];
+}
+
+#define cpuideax (cpuid_eax(0x80000008) & 0xff)
+#define phys_addr  cpuideax
+
+
+static uint64_t phys_mask()
+{
+    return  PHYS_BITS_TO_MASK(phys_addr);
+}
+
+#define mtrr_phys_mask phys_mask()
 
 #define IA32_MTRR_PHYMASK_VALID		0x0000000000000800ULL
 #define IA32_MTRR_PHYSBASE_MASK		(mtrr_phys_mask & ~0x0000000000000FFFULL)
@@ -313,6 +339,17 @@ mtrr_init(void)
  * barrier synchronization among all processors. This function is
  * called from the rendezvous IPI handler, and mtrr_update_cpu().
  */
+
+//Bronzovka: For artifacts: i fixed here - work or don't work :)))
+
+#define	PATENTRY(n, type)	(type << ((n) * 8))
+#define	PAT_UC		0x0UL
+#define	PAT_WC		0x1UL
+#define	PAT_WT		0x4UL
+#define	PAT_WP		0x5UL
+#define	PAT_WB		0x6UL
+#define	PAT_UCMINUS	0x7UL
+
 static void
 mtrr_update_action(void * cache_control_type)
 {
@@ -341,8 +378,18 @@ mtrr_update_action(void * cache_control_type)
 		/* Change PA6 attribute field to WC */
 		uint64_t pat = rdmsr64(MSR_IA32_CR_PAT);
 		DBG("CPU%d PAT: was 0x%016llx\n", get_cpu_number(), pat);
-		pat &= ~(0x0FULL << 48);
-		pat |=  (0x01ULL << 48);
+		if (IsIntelCPU())
+        {
+        pat &= ~(0x0FULL << 48);
+        pat |=  (0x01ULL << 48);
+        //  printf("pat|: %lld \n",pat);
+        } else {
+        //Bronzovka: modified pat...
+           pat = PATENTRY(0, PAT_WB) | PATENTRY(1, PAT_WC) |
+           PATENTRY(2, PAT_UCMINUS) | PATENTRY(3, PAT_UC) |
+           PATENTRY(4, PAT_WB) | PATENTRY(5, PAT_WC) |
+           PATENTRY(6, PAT_UCMINUS) | PATENTRY(7, PAT_UC);
+        }
 		wrmsr64(MSR_IA32_CR_PAT, pat);
 		DBG("CPU%d PAT: is  0x%016llx\n",
 		    get_cpu_number(), rdmsr64(MSR_IA32_CR_PAT));

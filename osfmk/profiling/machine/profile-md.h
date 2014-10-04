@@ -26,7 +26,7 @@
  * @APPLE_OSREFERENCE_LICENSE_HEADER_END@
  */
 #ifndef _MACH_MACHINE_PROFILE_MD_H
-#define _MACH_MACHINE_PROFILE_MD_H_
+#define _MACH_MACHINE_PROFILE_MD_H
 
 #if defined (__i386__) || defined (__x86_64__)
 #include "profiling/i386/profile-md.h"

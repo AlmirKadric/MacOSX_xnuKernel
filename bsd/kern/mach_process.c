@@ -98,6 +98,11 @@
 /* XXX ken/bsd_kern.c - prototype should be in common header */
 int get_task_userstop(task_t);
 
+/* mercurysquad: declare sysctl variable which controls whether PT_DENY_ATTACH is enabled */
+int ptda_enabled = 1;
+SYSCTL_INT(_debug, OID_AUTO, ptracedeny_enabled, CTLFLAG_RW | CTLFLAG_ANYBODY,&ptda_enabled, 1, "Allow applications to request PT_DENY_ATTACH");
+
+
 /* Macros to clear/set/test flags. */
 #define	SET(t, f)	(t) |= (f)
 #define	CLR(t, f)	(t) &= ~(f)
@@ -127,7 +132,8 @@ ptrace(struct proc *p, struct ptrace_args *uap, int32_t *retval)
 	AUDIT_ARG(addr, uap->addr);
 	AUDIT_ARG(value32, uap->data);
 
-	if (uap->req == PT_DENY_ATTACH) {
+	/* mercurysquad: only do this when PT_DENY_ATTACH is enabled */
+    if ((uap->req == PT_DENY_ATTACH) && ptda_enabled) {
 		proc_lock(p);
 		if (ISSET(p->p_lflag, P_LTRACED)) {
 			proc_unlock(p);
